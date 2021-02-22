@@ -7,8 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/replit/database-go"
@@ -48,11 +46,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	t.Render(w, "index.html", "", "index")
 }
 
-var routes map[string]interface{}
-
-var max int
-
-var replit bool
+var Max int
 
 // New generate a new JSON endpoint
 func New(w http.ResponseWriter, r *http.Request) {
@@ -66,25 +60,24 @@ func New(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, pres := routes[route]; pres == true {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"status": "failed", "statusText": "already exists"}`)
-		return
-	} else if len(routes) <= max {
+	v, _ := database.Get(route)
+	fmt.Println(len(v))
+	if v, err := database.Get(route); len(v) == 0 {
 		var t interface{}
 		decoder := json.NewDecoder(r.Body)
 		decoder.Decode(&t)
-		routes[route] = t
-		if replit == true {
-			database.Set(route, fmt.Sprint(t))
-		}
+		database.Set(route, fmt.Sprint(t))
 
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `{"status": "success"}`)
 		return
+	} else if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, `{"status": "failed", "statusText": "not found"}`)
+		return
 	} else {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"status": "failed", "statusText": "too many routes"}`)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{"status": "failed", "statusText": "already taken"}`)
 		return
 	}
 }
@@ -100,49 +93,18 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	route := vars["route"]
 
-	if replit == false {
-		if v, pres := routes[route]; pres == true {
-			t := v
-			json, err := json.Marshal(t)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, `{"status": "failure", "statusText": "failed to serialize"}`)
-			}
-
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, string(json))
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintf(w, `{"status": "failure", "statusText": "not found"}`)
-		}
-	} else if replit == true {
-		v, err := database.Get(route)
-		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintf(w, `{"status": "failure", "statusText": "not found"}`)
-		} else {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, v)
-		}
+	v, err := database.Get(route)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, `{"status": "failure", "statusText": "not found"}`)
 	} else {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"status": "failure", "statusText": "something went wrong"}`)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, v)
 	}
+
 }
 
 func main() {
-	max, _ = strconv.Atoi(os.Getenv("max"))
-	if max == 0 {
-		max = 200
-	}
-	_, replit = os.LookupEnv("replit")
-	if replit {
-		replit = true
-	} else {
-		replit = false
-	}
-
-	routes = make(map[string]interface{})
 	r := mux.NewRouter()
 
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/dist"))))

@@ -1,0 +1,17 @@
+{
+    "name": "dummy-static",
+    "version": "0.0.1",
+    "description": "static assets for dummy",
+    "main": "index.ts",
+    "repository": "https://github.com/EthanJustice/dummy",
+    "author": "Ethan Justice",
+    "license": "GPL-3.0-or-later",
+    "private": true,
+    "devDependencies": {
+        "@types/turbolinks": "^5.2.0",
+        "esbuild": "^0.8.50"
+    },
+    "scripts": {
+        "build": "npx esbuild ./src/index.ts --bundle --minify --sourcemap --outfile=dist/index.js --target=chrome58,firefox57,safari11,edge16 && npx esbuild --bundle --minify ./src/index.css --outfile=dist/styles/index.css --watch"
+    }
+}

@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/replit/database-go"
 )
 
 // Templates
@@ -51,6 +52,8 @@ var routes map[string]interface{}
 
 var max int
 
+var replit bool
+
 // New generate a new JSON endpoint
 func New(w http.ResponseWriter, r *http.Request) {
 	route := r.Header.Get("X-Route")
@@ -72,6 +75,9 @@ func New(w http.ResponseWriter, r *http.Request) {
 		decoder := json.NewDecoder(r.Body)
 		decoder.Decode(&t)
 		routes[route] = t
+		if replit == true {
+			database.Set(route, fmt.Sprint(t))
+		}
 
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `{"status": "success"}`)
@@ -94,19 +100,33 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	route := vars["route"]
 
-	if v, pres := routes[route]; pres == true {
-		t := v
-		json, err := json.Marshal(t)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, `{"status": "failure", "statusText": "failed to serialize"}`)
-		}
+	if replit == false {
+		if v, pres := routes[route]; pres == true {
+			t := v
+			json, err := json.Marshal(t)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"status": "failure", "statusText": "failed to serialize"}`)
+			}
 
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, string(json))
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, string(json))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(w, `{"status": "failure", "statusText": "not found"}`)
+		}
+	} else if replit == true {
+		v, err := database.Get(route)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(w, `{"status": "failure", "statusText": "not found"}`)
+		} else {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, v)
+		}
 	} else {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, `{"status": "failure", "statusText": "not found"}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"status": "failure", "statusText": "something went wrong"}`)
 	}
 }
 
@@ -114,6 +134,12 @@ func main() {
 	max, _ = strconv.Atoi(os.Getenv("max"))
 	if max == 0 {
 		max = 200
+	}
+	_, replit = os.LookupEnv("replit")
+	if replit {
+		replit = true
+	} else {
+		replit = false
 	}
 
 	routes = make(map[string]interface{})

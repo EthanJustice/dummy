@@ -47,17 +47,24 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	t.Render(w, "index.html", "", "index")
 }
 
+var routes map[string]interface{}
+
 var max int
 
 // New generate a new JSON endpoint
 func New(w http.ResponseWriter, r *http.Request) {
 	route := r.Header.Get("X-Route")
+
+	w.Header().Set("Content-Type", "application/json")
+
 	if len(route) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{"status": "failure", "statusText": "no route specified"}`)
 		return
 	}
 
 	if _, pres := routes[route]; pres == true {
+		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, `{"status": "failed", "statusText": "already exists"}`)
 		return
 	} else if len(routes) <= max {
@@ -66,15 +73,42 @@ func New(w http.ResponseWriter, r *http.Request) {
 		decoder.Decode(&t)
 		routes[route] = t
 
+		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `{"status": "success"}`)
 		return
 	} else {
+		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, `{"status": "failed", "statusText": "too many routes"}`)
 		return
 	}
 }
 
-var routes map[string]interface{}
+// Get get an API response
+func Get(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/favicon.ico" || r.URL.Path == "/new" {
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	route := vars["route"]
+
+	if v, pres := routes[route]; pres == true {
+		t := v
+		json, err := json.Marshal(t)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"status": "failure", "statusText": "failed to serialize"}`)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, string(json))
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, `{"status": "failure", "statusText": "not found"}`)
+	}
+}
 
 func main() {
 	max, _ = strconv.Atoi(os.Getenv("max"))
@@ -88,6 +122,7 @@ func main() {
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/dist"))))
 	r.HandleFunc("/", Index).Methods("GET")
 	r.HandleFunc("/new", New).Methods("POST")
+	r.HandleFunc("/{route}", Get).Methods("GET")
 
 	r.NotFoundHandler = NotFound{}
 	log.Fatal(http.ListenAndServe(":8000", r))

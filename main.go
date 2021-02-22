@@ -1,10 +1,14 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"html/template"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -43,11 +47,36 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	t.Render(w, "index.html", "", "index")
 }
 
+var max int
+
+func New(w http.ResponseWriter, r *http.Request) {
+	route := r.Header.Get("X-Route")
+
+	if _, pres := routes[route]; pres == true {
+		fmt.Fprintf(w, "already exists")
+	} else if len(routes) <= max {
+		var t interface{}
+		decoder := json.NewDecoder(r.Body)
+		decoder.Decode(&t)
+		routes[route] = t
+
+		fmt.Fprintf(w, `{"status": "success"}`)
+	} else {
+		fmt.Fprintf(w, `{"status": "failed", "statusText": "too many routes"}`)
+	}
+}
+
+var routes map[string]interface{}
+
 func main() {
+	max, _ = strconv.Atoi(os.Getenv("max"))
+
+	routes = make(map[string]interface{})
 	r := mux.NewRouter()
 
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/dist"))))
 	r.HandleFunc("/", Index).Methods("GET")
+	r.HandleFunc("/new", New).Methods("POST")
 
 	r.NotFoundHandler = NotFound{}
 	log.Fatal(http.ListenAndServe(":8000", r))

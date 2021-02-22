@@ -1,5 +1,24 @@
 {{template "layout" .}}
 {{define "content"}}
 <h1>dummy</h1>
-<h2>A simple JSON API mocking service</h2>
+<h2>a dead-simple JSON API mocking service</h2>
+<pre>
+    <code class="javascript">fetch('/new', {
+    method: 'post', // /new endpoint only accepts POST requests
+    headers: {
+        'Content-Type': 'application/json',
+        'X-Route': 'route/to/thing' // this is the route to the new path, and must be set
+    },
+    body: JSON.stringify({
+        test: 'example string'
+    })
+}).then((resp) => resp.json()).then(v => console.log(v));</code>
+</pre>
+<h2>Usage</h2>
+<h3>Creating an Endpoint</h3>
+<p>To create a new route, make a POST request against <code>/new</code>. Make sure you set the <code>X-Route</code>
+    header to the route you want to use (do not include a slash at the beginning).</p>
+<h3>Getting JSON from an Endpoint</h3>
+<p>To get a response from an endpoint already created, make a GET request against
+    <code>/whatever/path/you/set/as/the/X-Route</code>.</p>
 {{end}}

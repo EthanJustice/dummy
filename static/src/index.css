@@ -111,6 +111,13 @@ input[type="text"]:focus {
     border: 2px solid var(--highlight);
 }
 
+code {
+    background-color: var(--quaternary);
+    color: var(--highlight);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
 @keyframes fadeIn {
     0% {
         opacity: 0;
